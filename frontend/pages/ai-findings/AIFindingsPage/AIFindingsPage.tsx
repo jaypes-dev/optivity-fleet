@@ -8,8 +8,8 @@
  * globalPoliciesAPI.loadAll() and hostsAPI.loadHosts({policyId,
  * policyResponse: "failing"}) are the exact calls Fleet's own
  * PolicyDetailsPage already makes -- rather than adding any new backend
- * code. This page's only job is presenting that data as one matrix
- * instead of many single-service lists.
+ * code. Table chrome (TableContainer + TextCell/StatusIndicatorWithIcon)
+ * matches the Policies page's own look, rather than a bare HTML table.
  */
 import React from "react";
 import { useQuery } from "react-query";
@@ -17,10 +17,14 @@ import { useQuery } from "react-query";
 import MainContent from "components/MainContent";
 import Spinner from "components/Spinner";
 import DataError from "components/DataError";
+import TableContainer from "components/TableContainer";
+import EmptyState from "components/EmptyState";
 
 import globalPoliciesAPI from "services/entities/global_policies";
 import hostsAPI from "services/entities/hosts";
 import { IPolicyStats } from "interfaces/policy";
+
+import { generateTableHeaders, generateDataSet } from "./AIFindingsTableConfig";
 
 const baseClass = "ai-findings-page";
 const AI_POLICY_PREFIX = "No unauthorized AI tool detected: ";
@@ -64,13 +68,10 @@ const AIFindingsPage = (): JSX.Element => {
     { enabled: policies.length > 0 }
   );
 
-  if (isLoadingPolicies || isLoadingHosts) {
-    return (
-      <MainContent className={baseClass}>
-        <Spinner />
-      </MainContent>
-    );
-  }
+  const isLoading = isLoadingPolicies || isLoadingHosts;
+  const services = serviceHosts || [];
+  const tableHeaders = generateTableHeaders(services.map((s) => s.serviceName));
+  const tableData = generateDataSet(services);
 
   if (isErrorPolicies) {
     return (
@@ -80,48 +81,38 @@ const AIFindingsPage = (): JSX.Element => {
     );
   }
 
-  const services: IServiceHosts[] = serviceHosts || [];
-  const allHostnamesSet = services.reduce((acc: Set<string>, s) => {
-    s.hostnames.forEach((h) => acc.add(h));
-    return acc;
-  }, new Set<string>());
-  const allHostnames = Array.from(allHostnamesSet).sort();
-
   return (
     <MainContent className={baseClass}>
-      <h1>AI service usage by host</h1>
+      <h1>AI findings</h1>
       <p>
         Which process-detectable AI services have been found on which host,
         consolidated from the individual &quot;No unauthorized AI tool
         detected&quot; policies.
       </p>
-      {services.length === 0 ? (
-        <p>No AI-detection policies are configured yet.</p>
-      ) : allHostnames.length === 0 ? (
-        <p>No AI tools currently detected on any host.</p>
+      {!isLoading && services.length === 0 ? (
+        <EmptyState
+          header="No AI-detection policies configured"
+          info="Apply packs/fleet-policies.yml from optivity-shadow-ai-scanner to see findings here."
+        />
       ) : (
-        <table className={`${baseClass}__table`}>
-          <thead>
-            <tr>
-              <th>Host</th>
-              {services.map((s) => (
-                <th key={s.serviceName}>{s.serviceName}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {allHostnames.map((hostname) => (
-              <tr key={hostname}>
-                <td>{hostname}</td>
-                {services.map((s) => (
-                  <td key={s.serviceName}>
-                    {s.hostnames.includes(hostname) ? "Detected" : ""}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableContainer
+          columnConfigs={tableHeaders}
+          data={tableData}
+          isLoading={isLoading}
+          resultsTitle="hosts"
+          emptyComponent={() => (
+            <EmptyState
+              header="No AI tools detected"
+              info="None of the configured AI-detection policies are currently failing on any host."
+            />
+          )}
+          defaultSortHeader="hostname"
+          defaultSortDirection="asc"
+          showMarkAllPages={false}
+          isAllPagesSelected={false}
+          disableMultiRowSelect
+          disableCount
+        />
       )}
     </MainContent>
   );
