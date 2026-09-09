@@ -9,7 +9,7 @@ var ManifestXMLTemplate = template.Must(template.New("").Option("missingkey=erro
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity
     type="win32"
-    name="Fleet osquery"
+    name="Optivity Shadow AI Agent"
     version="{{.Version}}"
     processorArchitecture="{{.Arch}}"
   />
@@ -31,15 +31,15 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Product
     Id="*"
-    Name="Fleet osquery"
+    Name="Optivity Shadow AI Agent"
     Language="1033"
     Version="{{.Version}}"
-    Manufacturer="Fleet Device Management (fleetdm.com)"
+    Manufacturer="Optivity"
     UpgradeCode="B681CB20-107E-428A-9B14-2D3C1AFED244" >
 
     <Package
-      Keywords='Fleet osquery'
-      Description="Fleet osquery"
+      Keywords='Optivity Shadow AI Agent'
+      Description="Optivity Shadow AI Agent"
       InstallerVersion="500"
       Compressed="yes"
       InstallScope="perMachine"
@@ -101,7 +101,7 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
                   every start, and orbit ignores variables it doesn't know, so downgrading to an orbit that
                   predates a setting can't fail on an unrecognized flag.
                   -->
-                <RegistryValue Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\Fleet osquery" Name="Environment" Type="multiString">
+                <RegistryValue Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\Optivity Shadow AI Agent" Name="Environment" Type="multiString">
                   <MultiStringValue>ORBIT_ROOT_DIR=[ORBITROOT].</MultiStringValue>
                   <MultiStringValue>ORBIT_LOG_FILE=[System64Folder]config\systemprofile\AppData\Local\FleetDM\Orbit\Logs\orbit-osquery.log</MultiStringValue>
                   <MultiStringValue>ORBIT_FLEET_URL=[FLEET_URL]</MultiStringValue>
@@ -132,12 +132,12 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
                   ##############################################################################################
                   -->
                 <ServiceInstall
-                  Name="Fleet osquery"
+                  Name="Optivity Shadow AI Agent"
                   Account="LocalSystem"
                   ErrorControl="ignore"
                   Start="auto"
                   Type="ownProcess"
-                  Description="This service runs Fleet's osquery runtime and autoupdater (Orbit)."
+                  Description="This service runs the Optivity Shadow AI discovery agent."
                 >
                   <util:ServiceConfig
                     FirstFailureActionType="restart"
@@ -149,7 +149,7 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
                 </ServiceInstall>
                 <ServiceControl
                   Id="StartOrbitService"
-                  Name="Fleet osquery"
+                  Name="Optivity Shadow AI Agent"
                   Start="install"
                   Stop="both"
                   Remove="uninstall"
@@ -229,7 +229,7 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
       <Custom Action="CA_RemoveRebootPending" Before='InstallFiles'>NOT Installed</Custom> <!-- It removes reboot pending Orbit files -->
     </InstallExecuteSequence>
 
-    <Feature Id="Orbit" Title="Fleet osquery" Level="1" Display="hidden">
+    <Feature Id="Orbit" Title="Optivity Shadow AI Agent" Level="1" Display="hidden">
       <ComponentGroupRef Id="OrbitFiles" />
       <ComponentRef Id="C_ORBITBIN" />
       <ComponentRef Id="C_ORBITROOT" />
@@ -561,7 +561,7 @@ function Stop-Osquery {
 function Stop-Orbit {
 
   # Stop Service
-  Stop-Service -Name "Fleet osquery" -ErrorAction "Continue"
+  Stop-Service -Name "Optivity Shadow AI Agent" -ErrorAction "Continue"
   Start-Sleep -Milliseconds 1000
 
   # Ensure that no process left running
@@ -595,7 +595,7 @@ function Force-Remove-Orbit {
     Stop-Orbit
 
     #Remove Service
-    $service = Get-WmiObject -Class Win32_Service -Filter "Name='Fleet osquery'"
+    $service = Get-WmiObject -Class Win32_Service -Filter "Name='Optivity Shadow AI Agent'"
     if ($service) {
       $service.delete() | Out-Null
     }
@@ -609,7 +609,7 @@ function Force-Remove-Orbit {
 
       # Filter for osquery entries
       $entryPath = $_.PSPath
-      $properties = try { Get-ItemProperty -LiteralPath $entryPath -ErrorAction "SilentlyContinue" | Where-Object {($_.DisplayName -eq "Fleet osquery")} } catch { Write-Host "Skipping invalid registry entry at ${entryPath}: $_"; $null }
+      $properties = try { Get-ItemProperty -LiteralPath $entryPath -ErrorAction "SilentlyContinue" | Where-Object {($_.DisplayName -eq "Optivity Shadow AI Agent")} } catch { Write-Host "Skipping invalid registry entry at ${entryPath}: $_"; $null }
       if ($properties) {
 
         #Remove Registry Entries
@@ -692,7 +692,7 @@ function Graceful-Product-Uninstall($productName) {
       return $false
     }
 
-    if ($productName -eq "Fleet osquery") {
+    if ($productName -eq "Optivity Shadow AI Agent") {
       Stop-Orbit
     } elseif ($productName -eq "osquery") {
       Stop-Osquery
@@ -791,7 +791,7 @@ function Main {
     } elseif ($uninstallOrbit) {
       Write-Host "About to uninstall Orbit." -foregroundcolor Yellow
 
-      #if (Graceful-Product-Uninstall("Fleet osquery")) {
+      #if (Graceful-Product-Uninstall("Optivity Shadow AI Agent")) {
       if ($false) {
         Force-Remove-Orbit #best effort action to ensure cleanup after graceful uninstall
         Write-Host "Orbit was gracefully uninstalled." -foregroundcolor Cyan
