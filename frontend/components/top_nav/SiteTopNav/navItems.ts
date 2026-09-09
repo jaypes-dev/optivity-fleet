@@ -99,6 +99,13 @@ export default (
       },
       withParams: { type: "query", names: ["fleet_id"] },
     },
+    {
+      name: "AI findings",
+      location: {
+        regex: new RegExp(`^${URL_PREFIX}/ai-findings`),
+        pathname: PATHS.AI_FINDINGS,
+      },
+    },
   ];
 
   if (isNoAccess) {

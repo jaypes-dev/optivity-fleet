@@ -236,6 +236,7 @@ export default {
   MANAGE_SCHEDULE: `${URL_PREFIX}/schedule/manage`,
   MANAGE_POLICIES: `${URL_PREFIX}/policies/manage`,
   NEW_POLICY: `${URL_PREFIX}/policies/new`,
+  AI_FINDINGS: `${URL_PREFIX}/ai-findings`,
   NEW_REPORT: `${URL_PREFIX}/reports/new`,
   RESET_PASSWORD: `${URL_PREFIX}/login/reset`,
   SETUP: `${URL_PREFIX}/setup`,
