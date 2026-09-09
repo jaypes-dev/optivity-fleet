@@ -1,0 +1,50 @@
+name: Sync with upstream fleetdm/fleet
+
+# Keeps this fork's branding patch (see OPTIVITY.md) riding on top of the
+# latest upstream Fleet instead of silently drifting behind it. Rebases
+# rather than merges, so this fork stays "upstream + one small patch on
+# top" -- no merge-commit history to untangle later.
+#
+# Fails loudly (red X + GitHub's own notification to watchers) rather than
+# force-pushing something broken:
+#   - a rebase conflict means upstream touched the same lines we patched
+#   - a failed build means the patch applied but something else broke
+# Either way, main is left untouched until a human resolves it.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"  # weekly, Monday -- an off-the-hour minute on purpose
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/fleetdm/fleet.git
+          git fetch upstream main
+
+      - name: Rebase our patch onto upstream/main
+        run: |
+          git config user.name "optivity-fleet-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git rebase upstream/main
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+
+      - name: Verify fleetctl still builds with the patch applied
+        run: go build -o /tmp/fleetctl-check ./cmd/fleetctl
+
+      - name: Push rebased main
+        run: git push --force-with-lease origin HEAD:main
