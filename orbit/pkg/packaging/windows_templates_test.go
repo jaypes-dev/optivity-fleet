@@ -39,8 +39,15 @@ func (n wixNode) find(local string, pred func(wixNode) bool) *wixNode {
 	return nil
 }
 
-// windowsServiceEnvironment renders the MSI template and returns the NAME=value entries of the "Fleet osquery"
-// service's per-service Environment registry value, failing if the output isn't well-formed XML.
+// windowsServiceEnvironment renders the MSI template and returns the NAME=value entries of the
+// "Optivity Shadow AI Agent" service's per-service Environment registry value, failing if the
+// output isn't well-formed XML.
+//
+// Optivity: this helper's Key suffix was left stale by the branding patch (2a3fcf59) -- still
+// "Fleet osquery" when the actual rendered Key had already become "Optivity Shadow AI Agent",
+// so every test using this helper failed unnoticed (masked further by an unrelated XML-comment
+// bug from later sensor-packaging work, whose fix is what surfaced this one). Caught by actually
+// running `go test`, not assumed to already pass.
 func windowsServiceEnvironment(t *testing.T, opt Options) []string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -52,7 +59,7 @@ func windowsServiceEnvironment(t *testing.T, opt Options) []string {
 	require.NoError(t, xml.Unmarshal(buf.Bytes(), &root), "rendered .wxs is not well-formed XML")
 
 	env := root.find("RegistryValue", func(n wixNode) bool {
-		return n.attr("Name") == "Environment" && strings.HasSuffix(n.attr("Key"), `\Services\Fleet osquery`)
+		return n.attr("Name") == "Environment" && strings.HasSuffix(n.attr("Key"), `\Services\Optivity Shadow AI Agent`)
 	})
 	require.NotNil(t, env, "service Environment RegistryValue not found")
 	assert.Equal(t, "multiString", env.attr("Type"))
@@ -145,4 +152,51 @@ func TestWindowsWixTemplateServiceEnvironment(t *testing.T) {
 		opt.EndUserEmail = "user@example.com"
 		assert.Contains(t, windowsServiceEnvironment(t, opt), "ORBIT_END_USER_EMAIL=user@example.com")
 	})
+}
+
+// TestWindowsWixTemplateSensorService checks the Phase 2 network sensor's own
+// service registration (see the main scanner repo's README, "Phase 2:
+// network sensor"): present, LocalSystem, and configured the same way
+// Orbit's own service is -- via a RegistryValue Environment block, not
+// ServiceInstall Arguments (windowsServiceEnvironment's own NotContains
+// check on the whole document already covers that half; this checks the
+// sensor's environment values are the right ones).
+func TestWindowsWixTemplateSensorService(t *testing.T) {
+	opt := Options{
+		FleetURL:            "https://fleet.example.com",
+		EnrollSecret:        "secret",
+		OrbitChannel:        "stable",
+		OsquerydChannel:     "stable",
+		DesktopChannel:      "stable",
+		OrbitUpdateInterval: 900000000000,
+		NativePlatform:      "windows",
+		Architecture:        ArchAmd64,
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, windowsWixTemplate.Execute(&buf, opt))
+
+	var root wixNode
+	require.NoError(t, xml.Unmarshal(buf.Bytes(), &root), "rendered .wxs is not well-formed XML")
+
+	svc := root.find("ServiceInstall", func(n wixNode) bool {
+		return n.attr("Name") == "Optivity Shadow AI Network Sensor"
+	})
+	require.NotNil(t, svc, "sensor ServiceInstall not found")
+	assert.Equal(t, "LocalSystem", svc.attr("Account"))
+	assert.Equal(t, "auto", svc.attr("Start"))
+	assert.Empty(t, svc.attr("Arguments"), "sensor must be configured via environment, not ServiceInstall Arguments")
+
+	env := root.find("RegistryValue", func(n wixNode) bool {
+		return n.attr("Name") == "Environment" && strings.HasSuffix(n.attr("Key"), `\Services\Optivity Shadow AI Network Sensor`)
+	})
+	require.NotNil(t, env, "sensor Environment RegistryValue not found")
+	var entries []string
+	for _, c := range env.Nodes {
+		entries = append(entries, c.Content)
+	}
+	assert.Equal(t, []string{
+		"OPTIVITY_SENSOR_DOMAINS_PATH=[ORBITBINSENSOR]ai-network-domains.json",
+		"OPTIVITY_SENSOR_FINDINGS_LOG=[ORBITBINSENSOR]findings.jsonl",
+	}, entries)
 }
