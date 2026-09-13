@@ -156,6 +156,63 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
                 />
               </Component>
             </Directory>
+            <!--
+              Phase 2 network sensor (see the main scanner repo's README,
+              "Phase 2: network sensor"): a second, independent Windows
+              service alongside Orbit's own, LocalSystem because a
+              real-time ETW session needs it. Its files are staged into
+              root\bin\sensor by windows.go's ORBIT_EXTRA_FILES_DIR copy
+              step (added alongside this template change); not built by
+              this repo itself, which has no such sensor of its own.
+            -->
+            <Directory Id="ORBITBINSENSOR" Name="sensor">
+              <Component Id="C_ORBITBINSENSOR" Guid="DBABCE4A-60BC-4228-B064-E09210D331E1">
+                <CreateFolder>
+                  <PermissionEx Sddl="O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)" />
+                </CreateFolder>
+                <File Id="F_EtwConsumer" Source="root\bin\sensor\EtwConsumer.exe">
+                  <PermissionEx Sddl="O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)" />
+                </File>
+                <!--
+                  Same convention as Orbit's own service above: configured
+                  via the environment (which the Service Control Manager
+                  merges in on every start), not ServiceInstall Arguments;
+                  a bare invocation (no CLI args at all, exactly what a
+                  service launches) already defaults to monitor mode, so
+                  there's no mode flag to pass either.
+                -->
+                <RegistryValue Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\Optivity Shadow AI Network Sensor" Name="Environment" Type="multiString">
+                  <MultiStringValue>OPTIVITY_SENSOR_DOMAINS_PATH=[ORBITBINSENSOR]ai-network-domains.json</MultiStringValue>
+                  <MultiStringValue>OPTIVITY_SENSOR_FINDINGS_LOG=[ORBITBINSENSOR]findings.jsonl</MultiStringValue>
+                </RegistryValue>
+                <ServiceInstall
+                  Name="Optivity Shadow AI Network Sensor"
+                  Account="LocalSystem"
+                  ErrorControl="ignore"
+                  Start="auto"
+                  Type="ownProcess"
+                  Description="Live network-destination detection for the Optivity Shadow AI discovery agent (Phase 2)."
+                >
+                  <util:ServiceConfig
+                    FirstFailureActionType="restart"
+                    SecondFailureActionType="restart"
+                    ThirdFailureActionType="restart"
+                    ResetPeriodInDays="1"
+                    RestartServiceDelayInSeconds="1"
+                  />
+                </ServiceInstall>
+                <ServiceControl
+                  Id="StartSensorService"
+                  Name="Optivity Shadow AI Network Sensor"
+                  Start="install"
+                  Stop="both"
+                  Remove="uninstall"
+                />
+              </Component>
+              <Component Id="C_ORBITBINSENSOR_DOMAINS" Guid="5DD2F7A8-C204-495C-91AC-F4494363D4A2">
+                <File Id="F_SensorDomains" Source="root\bin\sensor\ai-network-domains.json" />
+              </Component>
+            </Directory>
           </Directory>
         </Directory>
       </Directory>
@@ -233,6 +290,8 @@ var windowsWixTemplate = template.Must(template.New("").Option("missingkey=error
       <ComponentGroupRef Id="OrbitFiles" />
       <ComponentRef Id="C_ORBITBIN" />
       <ComponentRef Id="C_ORBITROOT" />
+      <ComponentRef Id="C_ORBITBINSENSOR" />
+      <ComponentRef Id="C_ORBITBINSENSOR_DOMAINS" />
     </Feature>
 
   </Product>

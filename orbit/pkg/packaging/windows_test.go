@@ -44,12 +44,17 @@ func TestCreateVersionInfo(t *testing.T) {
 		require.Equal(t, result.FixedFileInfo.FileType, "01")
 		require.Equal(t, result.FixedFileInfo.FileSubType, "00")
 
-		require.Equal(t, result.StringFileInfo.Comments, "Fleet osquery")
-		require.Equal(t, result.StringFileInfo.CompanyName, "Fleet Device Management (fleetdm.com)")
-		require.Equal(t, result.StringFileInfo.FileDescription, "Fleet osquery installer")
+		// Optivity: these 4 literals were left stale by the branding patch
+		// (2a3fcf59) -- it changed windows.go's actual values but not this
+		// test, so this whole subtest failed unnoticed since. Caught while
+		// verifying an unrelated change by actually running `go test`,
+		// which the branding patch itself evidently never was.
+		require.Equal(t, result.StringFileInfo.Comments, "Optivity Shadow AI Agent")
+		require.Equal(t, result.StringFileInfo.CompanyName, "Optivity")
+		require.Equal(t, result.StringFileInfo.FileDescription, "Optivity Shadow AI Agent installer")
 		require.Equal(t, result.StringFileInfo.FileVersion, "1.2.3.0")
 		require.Equal(t, result.StringFileInfo.LegalCopyright, fmt.Sprintf("%d Fleet Device Management Inc.", time.Now().Year()))
-		require.Equal(t, result.StringFileInfo.ProductName, "Fleet osquery")
+		require.Equal(t, result.StringFileInfo.ProductName, "Optivity Shadow AI Agent")
 		require.Equal(t, result.StringFileInfo.ProductVersion, "1.2.3.0")
 		require.Equal(t, result.ManifestPath, manifestPath)
 	})
