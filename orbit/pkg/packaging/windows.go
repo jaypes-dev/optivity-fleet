@@ -219,6 +219,18 @@ func BuildMSI(opt Options) (string, error) {
 			return "", err
 		}
 	}
+	// Optivity: stage any extra files a customized main.wxs references
+	// (e.g. the Phase 2 network sensor's Directory/Component in
+	// windows_templates.go, which expects root\bin\sensor\*) before Heat
+	// harvests the tree. Generic and no-op by default (this repo has no
+	// sensor of its own) rather than hardcoded to one specific file, so
+	// it's reusable for whatever a future customization needs bundled.
+	if extraDir := os.Getenv("ORBIT_EXTRA_FILES_DIR"); extraDir != "" {
+		if err := copyExtraFiles(extraDir, orbitRoot); err != nil {
+			return "", fmt.Errorf("copy ORBIT_EXTRA_FILES_DIR: %w", err)
+		}
+	}
+
 	if err := wix.Heat(tmpDir, opt.NativeTooling, absWixDir); err != nil {
 		return "", fmt.Errorf("package root files: %w", err)
 	}
@@ -251,6 +263,27 @@ func BuildMSI(opt Options) (string, error) {
 	log.Info().Str("path", filename).Msg("wrote msi package")
 
 	return filename, nil
+}
+
+// copyExtraFiles recursively copies srcDir's contents into dstDir,
+// preserving relative paths (e.g. srcDir/bin/sensor/foo.exe ->
+// dstDir/bin/sensor/foo.exe), so a customized main.wxs can reference files
+// that don't come from this repo's own build.
+func copyExtraFiles(srcDir, dstDir string) error {
+	return filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(dstDir, rel)
+		if d.IsDir() {
+			return secure.MkdirAll(dst, constant.DefaultDirMode)
+		}
+		return file.Copy(path, dst, constant.DefaultFileMode)
+	})
 }
 
 func checkWine(wineChecked bool) error {
