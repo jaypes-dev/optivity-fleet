@@ -50,9 +50,7 @@ jobs:
           egress-policy: audit
 
       - name: Install fleetctl
-        run: |
-          curl -fsSL https://fleetdm.com/resources/install-fleetctl.sh | bash
-          echo "$HOME/.fleetctl" >> "$GITHUB_PATH"
+        run: npm install -g fleetctl
 
       - name: Build MSI
         id: build-msi
