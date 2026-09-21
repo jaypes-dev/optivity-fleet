@@ -28,6 +28,9 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Remember our own .github/workflows before rebasing
+        run: git rev-parse HEAD > /tmp/pre-rebase-sha.txt
+
       - name: Fetch upstream
         run: |
           git remote add upstream https://github.com/fleetdm/fleet.git
@@ -38,6 +41,34 @@ jobs:
           git config user.name "optivity-fleet-sync"
           git config user.email "actions@users.noreply.github.com"
           git rebase upstream/main
+
+      # GITHUB_TOKEN is hard-blocked by GitHub itself from pushing any
+      # change to .github/workflows/* content (confirmed the hard way:
+      # "refusing to allow a GitHub App to ... without workflows
+      # permission", even with contents:write already granted above --
+      # that's a separate restriction disabling the 107 upstream workflows
+      # via the API doesn't touch). We don't want upstream's workflow
+      # *content* here regardless -- see OPTIVITY.md/the main README's
+      # "Disabling Fleet's own CI on the fork" -- so always keep our own,
+      # whatever upstream did to theirs, instead of trying to push a diff
+      # we're not allowed to push anyway.
+      #
+      # `git rm -r` before `git checkout <sha> -- <path>`, not just the
+      # checkout alone: checked directly (a throwaway repo, not assumed) --
+      # `git checkout <tree-ish> -- <path>` restores/reverts files that
+      # exist in <tree-ish>, but does NOT delete files new in the working
+      # tree that <tree-ish> never had. A workflow file upstream *adds*
+      # would otherwise survive this step and hit the exact same push
+      # rejection all over again.
+      - name: Keep our own .github/workflows, not upstream's
+        run: |
+          git rm -rqf -- .github/workflows
+          git checkout "$(cat /tmp/pre-rebase-sha.txt)" -- .github/workflows
+          if ! git diff --cached --quiet; then
+            git commit -m "Keep .github/workflows as this fork's own, not upstream's (GITHUB_TOKEN can't push workflow-file changes regardless, and we don't want Fleet's CI content here either way)"
+          else
+            echo "No workflow-file changes from upstream this time."
+          fi
 
       - uses: actions/setup-go@v5
         with:
